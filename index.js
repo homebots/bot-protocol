@@ -104,6 +104,25 @@ class StreamDecoder {
   }
 }
 
+class BotProtocolUtils {
+  buffer2string(buffer) {
+    return Array.from(buffer)
+      .map(x => String.fromCharCode(x))
+      .join('');
+  }
+
+  stringToBuffer(string) {
+    const length = string.length;
+    const buffer = new Uint8Array(length);
+
+    for (let i = 0; i < length; i++) {
+      buffer[i] = string.charCodeAt(i);
+    }
+
+    return buffer;
+  }
+}
+
 class BotProtocol {
   constructor(client) {
     this.client = client;
