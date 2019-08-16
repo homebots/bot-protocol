@@ -2,10 +2,7 @@
   "name": "@homebots/bot-protocol",
   "version": "0.0.0",
   "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo true"
-  },
+  "main": "./index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/homebots/bot-protocol.git"
