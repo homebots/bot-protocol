@@ -1,3 +1,5 @@
+'use strict';
+
 (function(factory) {
   if (typeof define === 'function' && define.amd) {
     define([], () => factory({}));
@@ -8,9 +10,6 @@
   }
 })(function(exports) {
   const Instruction = {
-    Noop:     1,
-    Reset:    2,
-    Ping:     3,
     Write:    10,
     Read:     11,
   };
@@ -18,6 +17,10 @@
   class StreamEncoder {
     constructor() {
       this.output = [];
+    }
+
+    setResponse(deferred) {
+      this.response = deferred;
     }
 
     writeByte(byte) {
@@ -50,11 +53,8 @@
       }
     }
 
-    getBuffer() {
-      const bytes = this.output;
-      this.output = [];
-
-      return new Uint8Array(bytes);
+    getBytes() {
+      return this.output;
     }
   }
 
@@ -65,18 +65,18 @@
     }
 
     readString() {
-      const string = [];
+      const chars = [];
       const buffer = this.buffer;
       const maxLength = buffer.length;
 
       while (buffer[this.pointer] !== 0) {
         if (this.pointer >= maxLength) break;
 
-        string.push(buffer[this.pointer])
+        chars.push(buffer[this.pointer])
         this.pointer++;
       }
 
-      return string.join('');
+      return chars.join('');
     }
 
     readNumber() {
@@ -107,63 +107,97 @@
     }
   }
 
-  class Utils {
-    buffer2string(buffer) {
-      return Array.from(buffer)
-        .map(x => String.fromCharCode(x))
-        .join('');
-    }
+  const Utils = {
+    bufferToString(buffer) {
+      const output = Array(buffer.length);
+      for (let i = 0; i < buffer.length; i++) {
+        output[i] = (buffer[i] < 15 ? '0' : '') + Number(buffer[i]).toString(16);
+      }
+
+      return output.join('');
+    },
 
     stringToBuffer(string) {
       const length = string.length;
-      const buffer = new Uint8Array(length);
+      const bytes = [];
 
-      for (let i = 0; i < length; i++) {
-        buffer[i] = string.charCodeAt(i);
+      for (let i = 0; i < length; i += 2) {
+        bytes.push(parseInt(string[i] + string[i + 1], 16));
       }
 
-      return buffer;
+      return new Uint8Array(bytes);
+    }
+  };
+
+  class Deferred {
+    constructor() {
+      this.promise = new Promise((resolve, reject) => this.$ = { resolve, reject });
+    }
+
+    resolve(value) {
+      this.$.resolve(value);
+    }
+
+    reject(error) {
+      this.$.reject(error);
     }
   }
 
-  class BotProtocol {
-    get Instruction() { return Instruction; }
+  const RequestId = {
+    id: 0,
+    get next() {
+      RequestId.id++;
 
-    noop() {
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Noop);
-      return encoder.getBuffer();
+      if (RequestId.id >= 255) {
+        RequestId.id = 1;
+      }
+
+      return RequestId.id;
+    }
+  };
+
+  class ClientAbstract {
+    constructor() {
+      this.client = { send(message) { console.log('Not implemented!', message); }};
+      this.requestQueue = [];
+      this.responseQueue = [];
     }
 
-    reset() {
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Reset);
-      return encoder.getBuffer();
+    push(encoder) {
+      this.requestQueue.push(encoder);
+      clearTimeout(this.sendTimer);
+      this.sendTimer = setTimeout(() => this.dispatch(), 2);
     }
 
-    debug(enabled = true) {
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Debug);
-      encoder.writeBool(enabled);
-      return encoder.getBuffer();
-    }
+    dispatch() {
+      const requestId = RequestId.next;
 
-    ping() {
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Ping);
-      return encoder.getBuffer();
+      const buffer = this.requestQueue.reduce((stack, encoder) => {
+        const response = encoder.response;
+
+        if (response) {
+          response.id = requestId;
+        }
+
+        return stack.concat(encoder.getBytes());
+      }, [requestId]);
+
+      const payload = new Uint8Array(buffer);
+
+      this.client.send(payload);
+      this.requestQueue.length = 0;
     }
 
     write(pin, value) {
       pin = Number(pin);
-      value = Number(value);
+      value = Number(!!value);
 
       const encoder = new StreamEncoder();
       encoder.writeByte(Instruction.Write);
       encoder.writeByte(pin);
-      encoder.writeByte(value ? 1 : 0);
+      encoder.writeByte(value);
 
-      return encoder.getBuffer();
+      this.push(encoder);
     }
 
     read(pin) {
@@ -173,79 +207,70 @@
       encoder.writeByte(Instruction.Read);
       encoder.writeByte(pin);
 
-      return encoder.getBuffer();
+      const deferred = new Deferred(encoder);
+      encoder.setResponse(deferred);
+
+      this.push(encoder);
+
+      return deferred.promise.then(response => {
+        // skip operation identifier
+        response.readByte();
+        return response.readByte();
+      });
     }
 
-    analogWrite(pin, value) {
-      pin = Number(pin);
-      value = Number(value);
-
-      if (value > 255) {
-        value = 255;
-      }
-
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.AnalogWrite);
-      encoder.writeByte(pin);
-      encoder.writeByte(value);
-
-      return encoder.getBuffer();
-    }
-
-    analogRead(pin) {
-      pin = Number(pin);
-
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Read);
-      encoder.writeByte(pin);
-
-      return encoder.getBuffer();
-    }
-
-    startReadStream(pin, frequency, bufferSize) {
-      pin = Number(pin);
-      frequency = Number(frequency);
-      bufferSize = Number(bufferSize);
-
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.ReadStream);
-      encoder.writeByte(pin);
-      encoder.writeNumber(frequency);
-      encoder.writeNumber(bufferSize);
-
-      return encoder.getBuffer();
-    }
-
-    stopReadStream() {
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.StopReadStream);
-      return encoder.getBuffer();
-    }
-
-    startWriteStream(pin, frequency, bytes) {
-      pin = Number(pin);
-      frequency = Number(frequency);
-
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.WriteStream);
-      encoder.writeByte(pin);
-      encoder.writeNumber(frequency);
-      encoder.writeBytes(bytes)
-
-      return encoder.getBuffer();
-    }
-
-    stopWriteStream() {
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.StopWriteStream);
-      return encoder.getBuffer();
+    timer(timeout) {
+      return new Promise((resolve) => setTimeout(resolve, timeout));
     }
   }
+
+  class BrowserClient extends ClientAbstract {
+    constructor(socketUrl) {
+      super();
+
+
+      const connect = () => {
+        const ws = new WebSocket(socketUrl);
+        this.client = ws;
+
+        ws.addEventListener('open', () => ws.send('text'));
+        ws.addEventListener('close', () => setTimeout(connect, 2000));
+        ws.addEventListener('message', (event) => {
+          const bytes = Utils.stringToBuffer(event.data);
+          const message = new StreamDecoder(bytes);
+          const responseId = message.readByte();
+
+          for (let i = 0; i < this.queue.length; i++) {
+            if (this.queue[i].id === responseId) {
+              this.queue[i].resolve(message);
+              this.queue.splice(i, 1);
+            }
+          }
+        });
+      };
+
+      connect();
+    }
+  }
+
+  const Methods = ['read', 'write', 'timer'];
+  const Constants = {
+    PIN_0:  0,
+    PIN_TX: 1,
+    PIN_2:  2,
+    PIN_RX: 3,
+
+    ON:     1,
+    OFF:    0,
+  };
 
   exports.StreamEncoder = StreamEncoder;
   exports.StreamDecoder = StreamDecoder;
   exports.Utils = Utils;
-  exports.Bot = new BotProtocol();
+  exports.Client = ClientAbstract;
+  exports.BrowserClient = BrowserClient;
+  exports.Constants = Constants;
+  exports.Methods = Methods;
 
   return exports;
 })
