@@ -12,6 +12,7 @@
   const Instruction = {
     Write:    10,
     Read:     11,
+    Delay:    12,
   };
 
   class StreamEncoder {
@@ -21,6 +22,10 @@
 
     setResponse(deferred) {
       this.response = deferred;
+    }
+
+    getResponse() {
+      return this.response || null;
     }
 
     writeByte(byte) {
@@ -173,10 +178,11 @@
       const requestId = RequestId.next;
 
       const buffer = this.requestQueue.reduce((stack, encoder) => {
-        const response = encoder.response;
+        const response = encoder.getResponse();
 
         if (response) {
           response.id = requestId;
+          this.responseQueue.push(response);
         }
 
         return stack.concat(encoder.getBytes());
@@ -186,6 +192,20 @@
 
       this.client.send(payload);
       this.requestQueue.length = 0;
+    }
+
+    onMessage(rawMessage) {
+      const bytes = Utils.stringToBuffer(rawMessage);
+      const message = new StreamDecoder(bytes);
+      const responseId = message.readByte();
+      const responseQueue = this.responseQueue;
+
+      for (let i = 0; i < responseQueue.length; i++) {
+        if (responseQueue[i].id === responseId) {
+          responseQueue[i].resolve(message);
+          responseQueue.splice(i, 1);
+        }
+      }
     }
 
     write(pin, value) {
@@ -222,12 +242,21 @@
     timer(timeout) {
       return new Promise((resolve) => setTimeout(resolve, timeout));
     }
+
+    delay(time) {
+      time = Number(time);
+
+      const encoder = new StreamEncoder();
+      encoder.writeByte(Instruction.Delay);
+      encoder.writeNumber(time);
+
+      this.push(encoder);
+    }
   }
 
   class BrowserClient extends ClientAbstract {
     constructor(socketUrl) {
       super();
-
 
       const connect = () => {
         const ws = new WebSocket(socketUrl);
@@ -235,25 +264,14 @@
 
         ws.addEventListener('open', () => ws.send('text'));
         ws.addEventListener('close', () => setTimeout(connect, 2000));
-        ws.addEventListener('message', (event) => {
-          const bytes = Utils.stringToBuffer(event.data);
-          const message = new StreamDecoder(bytes);
-          const responseId = message.readByte();
-
-          for (let i = 0; i < this.queue.length; i++) {
-            if (this.queue[i].id === responseId) {
-              this.queue[i].resolve(message);
-              this.queue.splice(i, 1);
-            }
-          }
-        });
+        ws.addEventListener('message', (event) => this.onMessage(event.data));
       };
 
       connect();
     }
   }
 
-  const Methods = ['read', 'write', 'timer'];
+  const Methods = ['read', 'write', 'timer', 'delay'];
   const Constants = {
     PIN_0:  0,
     PIN_TX: 1,
