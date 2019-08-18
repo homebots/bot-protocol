@@ -9,6 +9,9 @@
     factory(window.BotProtocol = {});
   }
 })(function(exports) {
+  const MAX_DELAY = 6871000;
+  const MAX_BUFFER_SIZE = 4096;
+
   const Instruction = {
     Write:    10,
     Read:     11,
@@ -29,33 +32,36 @@
     }
 
     writeByte(byte) {
+      if (this.output.length === MAX_BUFFER_SIZE) {
+        throw new Error(`Max buffer size (${MAX_BUFFER_SIZE}) reached!`);
+      }
+
       this.output.push(byte);
     }
 
-    writeBytes(bytes = []) {
-      this.output.push(...bytes);
-    }
-
     writeBool(boolean) {
-      this.output.push(boolean ? 1 : 0);
+      this.writeByte(boolean ? 1 : 0);
     }
 
     writeNumber(number) {
-      const hexNumber = '0000' + number.toString(16);
-      const bytes = hexNumber.slice(-4);
-      this.writeString(bytes, true);
+      if (number > MAX_DELAY) {
+        number = MAX_DELAY;
+      }
+
+      this.writeByte(number >> 12 & 0xf);
+      this.writeByte(number >> 8 & 0xf);
+      this.writeByte(number >> 4 & 0xf);
+      this.writeByte(number % 16);
     }
 
-    writeString(string, skipNullByte) {
+    writeString(string) {
       const length = string.length;
 
       for (let i = 0; i < length; i++) {
         this.writeByte(string.charCodeAt(i));
       }
 
-      if (!skipNullByte) {
-        this.writeByte(0);
-      }
+      this.writeByte(0);
     }
 
     getBytes() {
@@ -170,28 +176,46 @@
 
     push(encoder) {
       this.requestQueue.push(encoder);
+      this.tick();
+    }
+
+    tick() {
       clearTimeout(this.sendTimer);
       this.sendTimer = setTimeout(() => this.dispatch(), 2);
     }
 
     dispatch() {
+      const queue = this.requestQueue;
       const requestId = RequestId.next;
+      let buffer = [requestId];
+      let next;
 
-      const buffer = this.requestQueue.reduce((stack, encoder) => {
-        const response = encoder.getResponse();
+      while (next = queue.shift()) {
+        const bytes = next.getBytes();
+
+        if (buffer.length + bytes.length > MAX_BUFFER_SIZE) {
+          queue.unshift(next);
+          this.tick();
+          break;
+        }
+
+        const response = next.getResponse();
 
         if (response) {
           response.id = requestId;
           this.responseQueue.push(response);
         }
 
-        return stack.concat(encoder.getBytes());
-      }, [requestId]);
+        buffer.push(...bytes);
+      }
 
       const payload = new Uint8Array(buffer);
-
       this.client.send(payload);
-      this.requestQueue.length = 0;
+    }
+
+    runScript(source) {
+      const runner = new ScriptRunner();
+      return runner.run(this, String(source).trim());
     }
 
     onMessage(rawMessage) {
@@ -235,11 +259,12 @@
       return deferred.promise.then(response => {
         // skip operation identifier
         response.readByte();
-        return response.readByte();
+        const pinValue = response.readByte() || 0;
+        return `PIN ${pin} ${pinValue}`;
       });
     }
 
-    timer(timeout) {
+    wait(timeout) {
       return new Promise((resolve) => setTimeout(resolve, timeout));
     }
 
@@ -271,7 +296,7 @@
     }
   }
 
-  const Methods = ['read', 'write', 'timer', 'delay'];
+  const Methods = ['read', 'write', 'wait', 'delay'];
   const Constants = {
     PIN_0:  0,
     PIN_TX: 1,
@@ -281,6 +306,35 @@
     ON:     1,
     OFF:    0,
   };
+
+  class ScriptRunner {
+    constructor() {
+      const botFunctions = Methods.map(fn => `const ${fn} = Bot.${fn}.bind(Bot);\n`).join('');
+      const constants = 'const {' + Object.keys(Constants).join(', ') + '} = Constants;';
+
+      this.wrapper = `
+        ${botFunctions}
+        ${constants}
+        return async function() {
+          %s
+        }`;
+    }
+
+    async run(client, source) {
+      if (!source) {
+        return Promise.resolve(null);
+      }
+
+      const fn = Function('Bot', 'Constants', this.wrapper.replace('%s', source));
+      const compiledCode = fn(client, Constants);
+
+      try {
+        return await compiledCode.call(null);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    }
+  }
 
   exports.StreamEncoder = StreamEncoder;
   exports.StreamDecoder = StreamDecoder;
