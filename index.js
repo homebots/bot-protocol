@@ -13,17 +13,17 @@
   const MAX_BUFFER_SIZE = 4096;
 
   const InstructionId = {
-    BiWrite         = 10,
-    BiRead          = 11,
-    BiDelay         = 12,
-    BiPinMode       = 13,
-    BiI2CSetup      = 19,
-    BiI2CStart      = 20,
-    BiI2CStop       = 21,
-    BiI2CWrite      = 22,
-    BiI2CRead       = 23,
-    BiI2CSetAck     = 24,
-    BiI2CGetAck     = 25,
+    BiWrite         : 10,
+    BiRead          : 11,
+    BiDelay         : 12,
+    BiPinMode       : 13,
+    BiI2CSetup      : 19,
+    BiI2CStart      : 20,
+    BiI2CStop       : 21,
+    BiI2CWrite      : 22,
+    BiI2CRead       : 23,
+    BiI2CSetAck     : 24,
+    BiI2CGetAck     : 25,
   };
 
   class StreamEncoder {
