@@ -12,10 +12,18 @@
   const MAX_DELAY = 6871000;
   const MAX_BUFFER_SIZE = 4096;
 
-  const Instruction = {
-    Write:    10,
-    Read:     11,
-    Delay:    12,
+  const InstructionId = {
+    BiWrite         = 10,
+    BiRead          = 11,
+    BiDelay         = 12,
+    BiPinMode       = 13,
+    BiI2CSetup      = 19,
+    BiI2CStart      = 20,
+    BiI2CStop       = 21,
+    BiI2CWrite      = 22,
+    BiI2CRead       = 23,
+    BiI2CSetAck     = 24,
+    BiI2CGetAck     = 25,
   };
 
   class StreamEncoder {
@@ -231,52 +239,122 @@
         }
       }
     }
+  }
 
-    write(pin, value) {
-      pin = Number(pin);
-      value = Number(!!value);
+  function instructionTargetValue(instruction, target, value) {
+    const encoder = new StreamEncoder();
+    encoder.writeByte(instruction);
+    encoder.writeByte(target);
+    encoder.writeByte(value);
 
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Write);
-      encoder.writeByte(pin);
-      encoder.writeByte(value);
+    return encoder;
+  }
 
-      this.push(encoder);
-    }
+  function instructionValue(instruction, value) {
+    const encoder = new StreamEncoder();
+    encoder.writeByte(instruction);
+    encoder.writeByte(value);
 
+    return encoder;
+  }
+
+  function instructionOnly(instruction) {
+    const encoder = new StreamEncoder();
+    encoder.writeByte(instruction);
+
+    return encoder;
+  }
+
+  function readResponseByte(response) {
+    // skip operation identifier
+    response.readByte();
+    return response.readByte() || 0;
+  }
+
+  const Instructions = {
     read(pin) {
-      pin = Number(pin);
-
-      const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Read);
-      encoder.writeByte(pin);
-
-      const deferred = new Deferred(encoder);
+      const encoder = instructionValue(InstructionId.BiRead, Number(pin));
+      const deferred = new Deferred();
       encoder.setResponse(deferred);
 
       this.push(encoder);
 
-      return deferred.promise.then(response => {
-        // skip operation identifier
-        response.readByte();
-        return response.readByte() || 0;
-      });
-    }
+      return deferred.promise.then(readResponseByte);
+    },
 
     wait(timeout) {
       return new Promise((resolve) => setTimeout(resolve, timeout));
-    }
+    },
 
     delay(time) {
       time = Number(time);
 
       const encoder = new StreamEncoder();
-      encoder.writeByte(Instruction.Delay);
+      encoder.writeByte(InstructionId.BiDelay);
       encoder.writeNumber(time);
 
       this.push(encoder);
-    }
-  }
+    },
+
+    write(pin, value) {
+      this.push(instructionTargetValue(InstructionId.BiWrite, Number(pin), Number(!!value)));
+    },
+
+    pinMode(pin, mode) {
+      this.push(instructionTargetValue(InstructionId.BiPinMode, Number(pin), Number(mode)));
+    },
+
+    i2cSetup(pinData, pinClock) {
+      this.push(instructionTargetValue(InstructionId.BiI2CSetup), Number(pinData), Number(pinClock));
+    },
+
+    i2cStart() {
+      this.push(instructionOnly(InstructionId.BiI2CStart));
+    },
+
+    i2cStop() {
+      this.push(instructionOnly(InstructionId.BiI2CStop));
+    },
+
+    i2cRead() {
+      const encoder = instructionOnly(InstructionId.BiI2CRead);
+      const deferred = new Deferred();
+      encoder.setResponse(deferred);
+
+      this.push(encoder);
+
+      return deferred.promise.then(readResponseByte);
+    },
+
+    i2cWrite(value) {
+      const encoder = new StreamEncoder();
+      encoder.writeByte(InstructionId.BiI2CWrite);
+      encoder.writeByte(value);
+      this.push(encoder);
+    },
+
+    i2cSendAck() {
+      this.push(instructionValue(InstructionId.BiI2CSetAck, 0));
+    },
+
+    i2cSendNack() {
+      this.push(instructionValue(InstructionId.BiI2CSetAck, 1));
+    },
+
+    i2cGetAck() {
+      const encoder = instructionOnly(InstructionId.BiI2CGetAck);
+      const deferred = new Deferred();
+      encoder.setResponse(deferred);
+
+      this.push(encoder);
+
+      return deferred.promise.then(readResponseByte);
+    },
+
+    raw(encoder) {
+      this.push(encoder);
+    },
+  };
 
   class BrowserClient extends ClientAbstract {
     constructor(socketUrl) {
@@ -295,24 +373,25 @@
     }
   }
 
-  const Methods = ['read', 'write', 'wait', 'delay'];
   const Constants = {
-    PIN_0:  0,
-    PIN_TX: 1,
-    PIN_2:  2,
-    PIN_RX: 3,
-
     ON:     1,
     OFF:    0,
+
+    PIN_TX: 1,
+    PIN_RX: 3,
+    PIN_0:  0,
+    PIN_1:  1,
+    PIN_2:  2,
+    PIN_3:  3,
   };
 
   class ScriptRunner {
     constructor() {
-      const botFunctions = Methods.map(fn => `const ${fn} = Bot.${fn}.bind(Bot);\n`).join('');
+      const instructions = Object.keys(Instructions).map(fn => `let ${fn} = Instructions.${fn}.bind(Bot);\n`).join('');
       const constants = 'const {' + Object.keys(Constants).join(', ') + '} = Constants;';
 
       this.wrapper = `
-        ${botFunctions}
+        ${instructions}
         ${constants}
         return async function() {
           %s
@@ -324,8 +403,8 @@
         return Promise.resolve(null);
       }
 
-      const fn = Function('Bot', 'Constants', this.wrapper.replace('%s', source));
-      const compiledCode = fn(client, Constants);
+      const fn = Function('Bot', 'Instructions', 'Constants', this.wrapper.replace('%s', source));
+      const compiledCode = fn(client, Instructions, Constants);
 
       try {
         return await compiledCode.call(null);
@@ -341,7 +420,7 @@
   exports.Client = ClientAbstract;
   exports.BrowserClient = BrowserClient;
   exports.Constants = Constants;
-  exports.Methods = Methods;
+  exports.Instructions = Instructions;
 
   return exports;
 })
