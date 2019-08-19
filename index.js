@@ -305,7 +305,7 @@
     },
 
     i2cSetup(pinData, pinClock) {
-      this.push(instructionTargetValue(InstructionId.BiI2CSetup), Number(pinData), Number(pinClock));
+      this.push(instructionTargetValue(InstructionId.BiI2CSetup, Number(pinData), Number(pinClock)));
     },
 
     i2cStart() {
