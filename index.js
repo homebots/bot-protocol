@@ -259,8 +259,7 @@
       return deferred.promise.then(response => {
         // skip operation identifier
         response.readByte();
-        const pinValue = response.readByte() || 0;
-        return `PIN ${pin} ${pinValue}`;
+        return response.readByte() || 0;
       });
     }
 
