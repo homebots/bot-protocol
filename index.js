@@ -13,18 +13,36 @@
   const MAX_BUFFER_SIZE = 4096;
 
   const InstructionId = {
-    BiWrite         : 10,
-    BiRead          : 11,
-    BiDelay         : 12,
-    BiPinMode       : 13,
-    BiI2CSetup      : 19,
-    BiI2CStart      : 20,
-    BiI2CStop       : 21,
-    BiI2CWrite      : 22,
-    BiI2CRead       : 23,
-    BiI2CSetAck     : 24,
-    BiI2CGetAck     : 25,
+    BiError         : 0x00,
+    BiWrite         : 0x0a,
+    BiRead          : 0x0b,
+    BiDelay         : 0x0c,
+    BiPinMode       : 0x0d,
+    BiIoSetup       : 0x0e,
+
+    BiI2CSetup      : 0x13,
+    BiI2CStart      : 0x14,
+    BiI2CStop       : 0x15,
+    BiI2CWrite      : 0x16,
+    BiI2CRead       : 0x17,
+    BiI2CSetAck     : 0x18,
+    BiI2CGetAck     : 0x19,
+    BiI2CList       : 0x1a,
+    BiI2CFindDevice : 0x1b,
+    BiI2CWriteAndAck: 0x1c,
+
+    BiReadRegister  : 0x1e,
+    BiWriteRegister : 0x1f,
   };
+
+  const ErrorCode = {
+    EInvalidCommand         : 1,
+    EDeviceNotFound         : 2,
+  };
+
+  function getErrorByCode(code) {
+    return Object.keys(ErrorCode).find(error => ErrorCode[error] === code);
+  }
 
   class StreamEncoder {
     constructor() {
@@ -124,6 +142,10 @@
       const value = this.buffer[this.pointer++];
       return value;
     }
+
+    get nextByte() {
+      return this.buffer[this.pointer + 1];
+    }
   }
 
   const Utils = {
@@ -136,6 +158,10 @@
       return output.join('');
     },
 
+    bufferToHex(buffer) {
+      return buffer.map(x => (x < 15 ? '0' : '') + x.toString(16));
+    },
+
     stringToBuffer(string) {
       const length = string.length;
       const bytes = [];
@@ -145,6 +171,13 @@
       }
 
       return new Uint8Array(bytes);
+    },
+
+    toByteStream(...instructions) {
+      const encoder = new StreamEncoder();
+      instructions.forEach(byte => encoder.writeByte(byte));
+
+      return encoder;
     }
   };
 
@@ -218,6 +251,7 @@
       }
 
       const payload = new Uint8Array(buffer);
+      console.log('SEND', Utils.bufferToHex(buffer));
       this.client.send(payload);
     }
 
@@ -232,6 +266,13 @@
       const responseId = message.readByte();
       const responseQueue = this.responseQueue;
 
+      console.log('RECV', Utils.bufferToHex(Array.from(bytes)));
+      const isError = message.nextByte == 0;
+
+      if (isError) {
+        console.error("Command %d failed: %d", message.readByte(), message.readByte());
+      }
+
       for (let i = 0; i < responseQueue.length; i++) {
         if (responseQueue[i].id === responseId) {
           responseQueue[i].resolve(message);
@@ -239,30 +280,6 @@
         }
       }
     }
-  }
-
-  function instructionTargetValue(instruction, target, value) {
-    const encoder = new StreamEncoder();
-    encoder.writeByte(instruction);
-    encoder.writeByte(target);
-    encoder.writeByte(value);
-
-    return encoder;
-  }
-
-  function instructionValue(instruction, value) {
-    const encoder = new StreamEncoder();
-    encoder.writeByte(instruction);
-    encoder.writeByte(value);
-
-    return encoder;
-  }
-
-  function instructionOnly(instruction) {
-    const encoder = new StreamEncoder();
-    encoder.writeByte(instruction);
-
-    return encoder;
   }
 
   function readResponseByte(response) {
@@ -273,7 +290,7 @@
 
   const Instructions = {
     read(pin) {
-      const encoder = instructionValue(InstructionId.BiRead, Number(pin));
+      const encoder = Utils.toByteStream(InstructionId.BiRead, Number(pin));
       const deferred = new Deferred();
       encoder.setResponse(deferred);
 
@@ -297,27 +314,28 @@
     },
 
     write(pin, value) {
-      this.push(instructionTargetValue(InstructionId.BiWrite, Number(pin), Number(!!value)));
+      this.push(Utils.toByteStream(InstructionId.BiWrite, Number(pin), Number(!!value)));
     },
 
     pinMode(pin, mode) {
-      this.push(instructionTargetValue(InstructionId.BiPinMode, Number(pin), Number(mode)));
+      this.push(Utils.toByteStream(InstructionId.BiPinMode, Number(pin), Number(mode)));
     },
 
     i2cSetup(pinData, pinClock) {
-      this.push(instructionTargetValue(InstructionId.BiI2CSetup, Number(pinData), Number(pinClock)));
+      this.push(Utils.toByteStream(InstructionId.BiI2CSetup));
+      // this.push(Utils.toByteStream(InstructionId.BiI2CSetup, Number(pinData), Number(pinClock)));
     },
 
     i2cStart() {
-      this.push(instructionOnly(InstructionId.BiI2CStart));
+      this.push(Utils.toByteStream(InstructionId.BiI2CStart));
     },
 
     i2cStop() {
-      this.push(instructionOnly(InstructionId.BiI2CStop));
+      this.push(Utils.toByteStream(InstructionId.BiI2CStop));
     },
 
     i2cRead() {
-      const encoder = instructionOnly(InstructionId.BiI2CRead);
+      const encoder = Utils.toByteStream(InstructionId.BiI2CRead);
       const deferred = new Deferred();
       encoder.setResponse(deferred);
 
@@ -333,16 +351,57 @@
       this.push(encoder);
     },
 
+    i2cWriteAndAck(stream) {
+      const encoder = new StreamEncoder();
+
+      if (Array.isArray(stream)) {
+        encoder.writeByte(InstructionId.BiI2CWriteAndAck);
+        encoder.writeNumber(stream.length);
+        stream.forEach(byte => encoder.writeByte(byte));
+      } else {
+        encoder.writeByte(InstructionId.BiI2CWrite);
+        encoder.writeByte(stream);
+        encoder.writeByte(InstructionId.BiI2CGetAck);
+      }
+
+      this.push(encoder);
+    },
+
     i2cSendAck() {
-      this.push(instructionValue(InstructionId.BiI2CSetAck, 0));
+      this.push(Utils.toByteStream(InstructionId.BiI2CSetAck, 0));
     },
 
     i2cSendNack() {
-      this.push(instructionValue(InstructionId.BiI2CSetAck, 1));
+      this.push(Utils.toByteStream(InstructionId.BiI2CSetAck, 1));
     },
 
     i2cGetAck() {
-      const encoder = instructionOnly(InstructionId.BiI2CGetAck);
+      const encoder = Utils.toByteStream(InstructionId.BiI2CGetAck);
+      const deferred = new Deferred();
+      encoder.setResponse(deferred);
+
+      this.push(encoder);
+
+      return deferred.promise.then(readResponseByte);
+    },
+
+    i2cListDevices() {
+      const encoder = Utils.toByteStream(InstructionId.BiI2CList);
+      const deferred = new Deferred();
+      encoder.setResponse(deferred);
+
+      this.push(encoder);
+
+      return deferred.promise.then(response => {
+        response.readByte();
+
+        const list = Array.from({ length: 255 });
+        return list.map(() => response.readByte());
+      });
+    },
+
+    i2cFindDevice() {
+      const encoder = Utils.toByteStream(InstructionId.BiI2CFindDevice);
       const deferred = new Deferred();
       encoder.setResponse(deferred);
 
