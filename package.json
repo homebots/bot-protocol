@@ -12,5 +12,13 @@
   "bugs": {
     "url": "https://github.com/homebots/bot-protocol/issues"
   },
-  "homepage": "https://github.com/homebots/bot-protocol#readme"
+  "homepage": "https://github.com/homebots/bot-protocol#readme",
+  "devDependencies": {
+    "nodemon": "^1.19.4",
+    "typescript": "^3.7.2"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "tsc -p . -w"
+  }
 }
