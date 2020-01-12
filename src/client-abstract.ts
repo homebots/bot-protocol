@@ -1,4 +1,5 @@
-import { MAX_BUFFER_SIZE } from "./constants";
+import { MAX_BUFFER_SIZE } from './constants';
+import { RequestId } from './request-id';
 
 export class ClientAbstract {
   requestQueue = [];

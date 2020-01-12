@@ -184,7 +184,6 @@ define("instructions", ["require", "exports", "helpers", "defer", "stream-encode
         BiRead: 0x0b,
         BiDelay: 0x0c,
         BiPinMode: 0x0d,
-        BiIoSetup: 0x0e,
         BiI2CSetup: 0x13,
         BiI2CStart: 0x14,
         BiI2CStop: 0x15,
@@ -195,6 +194,7 @@ define("instructions", ["require", "exports", "helpers", "defer", "stream-encode
         BiI2CList: 0x1a,
         BiI2CFindDevice: 0x1b,
         BiI2CWriteAndAck: 0x1c,
+        BiPinType: 0x1d,
         BiReadRegister: 0x1e,
         BiWriteRegister: 0x1f,
         BiInterrupt: 0x20,
@@ -310,7 +310,23 @@ define("instructions", ["require", "exports", "helpers", "defer", "stream-encode
     }
     exports.raw = raw;
 });
-define("client-abstract", ["require", "exports", "constants"], function (require, exports, constants_2) {
+define("request-id", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class RequestId {
+        get next() {
+            RequestId.id++;
+            if (RequestId.id >= 255) {
+                RequestId.id = 1;
+            }
+            return RequestId.id;
+        }
+    }
+    exports.RequestId = RequestId;
+    RequestId.id = 0;
+    ;
+});
+define("client-abstract", ["require", "exports", "constants", "request-id"], function (require, exports, constants_2, request_id_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ClientAbstract {
@@ -329,7 +345,7 @@ define("client-abstract", ["require", "exports", "constants"], function (require
         }
         dispatch() {
             const queue = this.requestQueue;
-            const requestId = RequestId.next;
+            const requestId = request_id_1.RequestId.next;
             let buffer = [requestId];
             let next;
             while (next = queue.shift()) {

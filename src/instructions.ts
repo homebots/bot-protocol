@@ -3,15 +3,16 @@ import { Defer } from "./defer";
 import { StreamEncoder } from "./stream-encoder";
 import { StreamDecoder } from "./stream-decoder";
 
+
 export const InstructionId = {
   BiError         : 0x00,
   BiLoop          : 0x01,
   BiGoTo          : 0x02,
+
   BiWrite         : 0x0a,
   BiRead          : 0x0b,
   BiDelay         : 0x0c,
   BiPinMode       : 0x0d,
-  BiIoSetup       : 0x0e,
 
   BiI2CSetup      : 0x13,
   BiI2CStart      : 0x14,
@@ -24,6 +25,7 @@ export const InstructionId = {
   BiI2CFindDevice : 0x1b,
   BiI2CWriteAndAck: 0x1c,
 
+  BiPinType       : 0x1d,
   BiReadRegister  : 0x1e,
   BiWriteRegister : 0x1f,
 
