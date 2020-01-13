@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "target": "es6",
+    "outFile": "./index.js",
+    "allowUmdGlobalAccess": true,
+    "alwaysStrict": true,
+    "esModuleInterop": true,
+    "module": "amd",
+    "lib": ["es6", "dom"],
+  },
+  "files": ["./src/index.ts"],
+}
