@@ -33,7 +33,7 @@ export class StreamDecoder {
       buffer[start + 3]
     ];
 
-    const number = parseInt(bytes.map(b => String.fromCharCode(b)), 16);
+    const number = parseInt(bytes.map(b => String.fromCharCode(b)).join(''), 16);
     this.pointer += 4;
 
     return number;

@@ -1,7 +1,6 @@
 export class RequestId {
   static id = 0;
-
-  get next() {
+  static next() {
     RequestId.id++;
 
     if (RequestId.id >= 255) {

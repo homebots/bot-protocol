@@ -1,10 +1,18 @@
 import { MAX_BUFFER_SIZE } from './constants';
 import { RequestId } from './request-id';
+import { bufferToHex, stringToBuffer } from './helpers';
+import { StreamDecoder } from './stream-decoder';
+import { ScriptRunner } from './runner';
+
+export interface ClientSocket {
+  send(message: string | Uint8Array): void;
+}
 
 export class ClientAbstract {
   requestQueue = [];
   responseQueue = [];
   sendTimer: number;
+  client: ClientSocket;
 
   constructor() {
     this.client = { send(message) { console.log('Not implemented!', message); }};
@@ -22,7 +30,7 @@ export class ClientAbstract {
 
   dispatch() {
     const queue = this.requestQueue;
-    const requestId = RequestId.next;
+    const requestId = RequestId.next();
     let buffer = [requestId];
     let next;
 

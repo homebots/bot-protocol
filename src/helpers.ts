@@ -1,3 +1,5 @@
+import { StreamEncoder } from "./stream-encoder";
+
 export function bufferToString(buffer) {
   const output = Array(buffer.length);
   for (let i = 0; i < buffer.length; i++) {

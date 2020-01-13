@@ -1,3 +1,12 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
@@ -5,43 +14,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-define("helpers", ["require", "exports"], function (require, exports) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    function bufferToString(buffer) {
-        const output = Array(buffer.length);
-        for (let i = 0; i < buffer.length; i++) {
-            output[i] = (buffer[i] < 15 ? '0' : '') + Number(buffer[i]).toString(16);
-        }
-        return output.join('');
-    }
-    exports.bufferToString = bufferToString;
-    function bufferToHex(buffer) {
-        return buffer.map(x => (x < 15 ? '0' : '') + x.toString(16));
-    }
-    exports.bufferToHex = bufferToHex;
-    function stringToBuffer(string) {
-        const length = string.length;
-        const bytes = [];
-        for (let i = 0; i < length; i += 2) {
-            bytes.push(parseInt(string[i] + string[i + 1], 16));
-        }
-        return new Uint8Array(bytes);
-    }
-    exports.stringToBuffer = stringToBuffer;
-    function toByteStream(...instructions) {
-        const encoder = new StreamEncoder();
-        instructions.forEach(byte => encoder.writeByte(byte));
-        return encoder;
-    }
-    exports.toByteStream = toByteStream;
-    function readResponseByte(response) {
-        // skip operation identifier
-        response.readByte();
-        return response.readByte() || 0;
-    }
-    exports.readResponseByte = readResponseByte;
-});
 define("defer", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -126,6 +98,43 @@ define("stream-encoder", ["require", "exports", "constants"], function (require,
     }
     exports.StreamEncoder = StreamEncoder;
 });
+define("helpers", ["require", "exports", "stream-encoder"], function (require, exports, stream_encoder_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    function bufferToString(buffer) {
+        const output = Array(buffer.length);
+        for (let i = 0; i < buffer.length; i++) {
+            output[i] = (buffer[i] < 15 ? '0' : '') + Number(buffer[i]).toString(16);
+        }
+        return output.join('');
+    }
+    exports.bufferToString = bufferToString;
+    function bufferToHex(buffer) {
+        return buffer.map(x => (x < 15 ? '0' : '') + x.toString(16));
+    }
+    exports.bufferToHex = bufferToHex;
+    function stringToBuffer(string) {
+        const length = string.length;
+        const bytes = [];
+        for (let i = 0; i < length; i += 2) {
+            bytes.push(parseInt(string[i] + string[i + 1], 16));
+        }
+        return new Uint8Array(bytes);
+    }
+    exports.stringToBuffer = stringToBuffer;
+    function toByteStream(...instructions) {
+        const encoder = new stream_encoder_1.StreamEncoder();
+        instructions.forEach(byte => encoder.writeByte(byte));
+        return encoder;
+    }
+    exports.toByteStream = toByteStream;
+    function readResponseByte(response) {
+        // skip operation identifier
+        response.readByte();
+        return response.readByte() || 0;
+    }
+    exports.readResponseByte = readResponseByte;
+});
 define("stream-decoder", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -155,7 +164,7 @@ define("stream-decoder", ["require", "exports"], function (require, exports) {
                 buffer[start + 2],
                 buffer[start + 3]
             ];
-            const number = parseInt(bytes.map(b => String.fromCharCode(b)), 16);
+            const number = parseInt(bytes.map(b => String.fromCharCode(b)).join(''), 16);
             this.pointer += 4;
             return number;
         }
@@ -173,7 +182,7 @@ define("stream-decoder", ["require", "exports"], function (require, exports) {
     }
     exports.StreamDecoder = StreamDecoder;
 });
-define("instructions", ["require", "exports", "helpers", "defer", "stream-encoder"], function (require, exports, helpers_1, defer_1, stream_encoder_1) {
+define("instructions", ["require", "exports", "helpers", "defer", "stream-encoder"], function (require, exports, helpers_1, defer_1, stream_encoder_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.InstructionId = {
@@ -213,7 +222,7 @@ define("instructions", ["require", "exports", "helpers", "defer", "stream-encode
     exports.wait = wait;
     function delay(time) {
         time = Number(time);
-        const encoder = new stream_encoder_1.StreamEncoder();
+        const encoder = new stream_encoder_2.StreamEncoder();
         encoder.writeByte(exports.InstructionId.BiDelay);
         encoder.writeNumber(time);
         this.push(encoder);
@@ -248,14 +257,14 @@ define("instructions", ["require", "exports", "helpers", "defer", "stream-encode
     }
     exports.i2cRead = i2cRead;
     function i2cWrite(value) {
-        const encoder = new stream_encoder_1.StreamEncoder();
+        const encoder = new stream_encoder_2.StreamEncoder();
         encoder.writeByte(exports.InstructionId.BiI2CWrite);
         encoder.writeByte(value);
         this.push(encoder);
     }
     exports.i2cWrite = i2cWrite;
     function i2cWriteAndAck(stream) {
-        const encoder = new stream_encoder_1.StreamEncoder();
+        const encoder = new stream_encoder_2.StreamEncoder();
         if (Array.isArray(stream)) {
             encoder.writeByte(exports.InstructionId.BiI2CWriteAndAck);
             encoder.writeNumber(stream.length);
@@ -314,7 +323,7 @@ define("request-id", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class RequestId {
-        get next() {
+        static next() {
             RequestId.id++;
             if (RequestId.id >= 255) {
                 RequestId.id = 1;
@@ -326,7 +335,40 @@ define("request-id", ["require", "exports"], function (require, exports) {
     RequestId.id = 0;
     ;
 });
-define("client-abstract", ["require", "exports", "constants", "request-id"], function (require, exports, constants_2, request_id_1) {
+define("runner", ["require", "exports", "instructions", "constants"], function (require, exports, Instructions, constants_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    Instructions = __importStar(Instructions);
+    class ScriptRunner {
+        constructor() {
+            const instructions = Object.keys(Instructions).map(fn => `let ${fn} = Instructions.${fn}.bind(Bot);\n`).join('');
+            const constants = 'const {' + Object.keys(constants_2.Constants).join(', ') + '} = Constants;';
+            this.wrapper = `
+      ${instructions}
+      ${constants}
+      return async function() {
+        %s
+      }`;
+        }
+        run(client, source) {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (!source) {
+                    return Promise.resolve(null);
+                }
+                const fn = Function('Bot', 'Instructions', 'Constants', this.wrapper.replace('%s', source));
+                const compiledCode = fn(client, Instructions, constants_2.Constants);
+                try {
+                    return yield compiledCode.call(null);
+                }
+                catch (error) {
+                    return Promise.reject(error);
+                }
+            });
+        }
+    }
+    exports.ScriptRunner = ScriptRunner;
+});
+define("client-abstract", ["require", "exports", "constants", "request-id", "helpers", "stream-decoder", "runner"], function (require, exports, constants_3, request_id_1, helpers_2, stream_decoder_1, runner_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ClientAbstract {
@@ -345,12 +387,12 @@ define("client-abstract", ["require", "exports", "constants", "request-id"], fun
         }
         dispatch() {
             const queue = this.requestQueue;
-            const requestId = request_id_1.RequestId.next;
+            const requestId = request_id_1.RequestId.next();
             let buffer = [requestId];
             let next;
             while (next = queue.shift()) {
                 const bytes = next.getBytes();
-                if (buffer.length + bytes.length > constants_2.MAX_BUFFER_SIZE) {
+                if (buffer.length + bytes.length > constants_3.MAX_BUFFER_SIZE) {
                     queue.unshift(next);
                     this.tick();
                     break;
@@ -363,19 +405,19 @@ define("client-abstract", ["require", "exports", "constants", "request-id"], fun
                 buffer.push(...bytes);
             }
             const payload = new Uint8Array(buffer);
-            console.log('SEND', bufferToHex(buffer));
+            console.log('SEND', helpers_2.bufferToHex(buffer));
             this.client.send(payload);
         }
         runScript(source) {
-            const runner = new ScriptRunner();
+            const runner = new runner_1.ScriptRunner();
             return runner.run(this, String(source).trim());
         }
         onMessage(rawMessage) {
-            const bytes = stringToBuffer(rawMessage);
-            const message = new StreamDecoder(bytes);
+            const bytes = helpers_2.stringToBuffer(rawMessage);
+            const message = new stream_decoder_1.StreamDecoder(bytes);
             const responseId = message.readByte();
             const responseQueue = this.responseQueue;
-            console.log('RECV', bufferToHex(Array.from(bytes)));
+            console.log('RECV', helpers_2.bufferToHex(Array.from(bytes)));
             const isError = message.nextByte == 0;
             if (isError) {
                 console.error("Command %d failed: %d", message.readByte(), message.readByte());
@@ -408,18 +450,18 @@ define("browser", ["require", "exports", "client-abstract"], function (require, 
     }
     exports.BrowserClient = BrowserClient;
 });
-define("public_api", ["require", "exports", "instructions", "helpers", "constants", "stream-encoder", "stream-decoder", "client-abstract", "browser"], function (require, exports, Instructions, Utils, constants_3, stream_encoder_2, stream_decoder_1, client_abstract_2, browser_1) {
+define("public_api", ["require", "exports", "instructions", "helpers", "constants", "stream-encoder", "stream-decoder", "client-abstract", "browser"], function (require, exports, Instructions, Utils, constants_4, stream_encoder_3, stream_decoder_2, client_abstract_2, browser_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     Instructions = __importStar(Instructions);
     Utils = __importStar(Utils);
-    exports.StreamEncoder = stream_encoder_2.StreamEncoder;
-    exports.StreamDecoder = stream_decoder_1.StreamDecoder;
+    exports.StreamEncoder = stream_encoder_3.StreamEncoder;
+    exports.StreamDecoder = stream_decoder_2.StreamDecoder;
     exports.ClientAbstract = client_abstract_2.ClientAbstract;
     exports.BrowserClient = browser_1.BrowserClient;
     exports.default = {
         Utils,
-        Constants: constants_3.Constants,
+        Constants: constants_4.Constants,
         Instructions,
     };
 });
