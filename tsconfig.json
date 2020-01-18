@@ -4,12 +4,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "target": "es6",
-    "outFile": "./index.js",
+    "outDir": "dist",
     "allowUmdGlobalAccess": true,
     "alwaysStrict": true,
     "esModuleInterop": true,
-    "module": "amd",
+    "module": "commonjs",
     "lib": ["es6", "dom"],
+    "typeRoots": ["node_modules"],
+    "types": ["node", "jasmine"]
   },
-  "files": ["./src/index.ts"],
+  "files": ["src/index.ts"],
+  "exclude": ["*.spec.ts"]
 }

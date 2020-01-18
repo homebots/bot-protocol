@@ -1,0 +1,140 @@
+{
+  "$schema": "./schema.json",
+  "version": 1,
+  "constants": {
+    "ON": 1,
+    "OFF": 0,
+    "PIN_TX": 1,
+    "PIN_RX": 3,
+    "PIN_0": 0,
+    "PIN_1": 1,
+    "PIN_2": 2,
+    "PIN_3": 3
+  },
+  "instructions": [
+    {
+      "name": "loop",
+      "code": "01",
+      "args": []
+    },
+    {
+      "name": "moveTo",
+      "code": "02",
+      "args": []
+    },
+    {
+      "name": "write",
+      "code": "0a",
+      "args": [
+        "number",
+        "number"
+      ]
+    },
+    {
+      "name": "read",
+      "code": "0b",
+      "args": [],
+      "async": true
+    },
+    {
+      "name": "delay",
+      "code": "0c",
+      "args": ["number"]
+    },
+    {
+      "name": "pinMode",
+      "code": "0d",
+      "args": [
+        "number",
+        "number"
+      ]
+    },
+    {
+      "name": "i2CSetup",
+      "code": "13",
+      "args": [
+        "number",
+        "number"
+      ]
+    },
+    {
+      "name": "i2CStart",
+      "code": "14",
+      "args": []
+    },
+    {
+      "name": "i2CStop",
+      "code": "15",
+      "args": []
+    },
+    {
+      "name": "i2CWrite",
+      "code": "16",
+      "args": ["number"]
+    },
+    {
+      "name": "i2CRead",
+      "code": "17",
+      "async": true,
+      "args": ["number"]
+    },
+    {
+      "name": "i2CSetAck",
+      "code": "18",
+      "args": []
+    },
+    {
+      "name": "i2CGetAck",
+      "code": "19",
+      "async": true,
+      "args": []
+    },
+    {
+      "name": "i2CList",
+      "code": "1a",
+      "args": []
+    },
+    {
+      "name": "i2CFindDevice",
+      "code": "1b",
+      "async": true,
+      "args": []
+    },
+    {
+      "name": "i2CWriteAndAck",
+      "code": "1c",
+      "args": []
+    },
+    {
+      "name": "i2cSendAck",
+      "code": "18",
+      "args": [{ "type": "literal", "value": 0 }]
+    },
+    {
+      "name": "i2cSendNack",
+      "code": "18",
+      "args": [{ "type": "literal", "value": 1 }]
+    },
+    {
+      "name": "pinType",
+      "code": "1d",
+      "args": ["number", "number"]
+    },
+    {
+      "name": "readRegister",
+      "code": "1e",
+      "args": ["int"]
+    },
+    {
+      "name": "writeRegister",
+      "code": "1f",
+      "async": true,
+      "args": ["int"]
+    },
+    {
+      "name": "interrupt",
+      "code": "20",
+      "args": ["number"]
+    }
+  ]
+}

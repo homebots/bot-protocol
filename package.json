@@ -2,7 +2,7 @@
   "name": "@homebots/bot-protocol",
   "version": "0.0.0",
   "description": "",
-  "main": "./index.js",
+  "main": "./dist/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/homebots/bot-protocol.git"
@@ -14,11 +14,19 @@
   },
   "homepage": "https://github.com/homebots/bot-protocol#readme",
   "devDependencies": {
+    "@types/jasmine": "^3.5.0",
+    "@types/node": "^13.1.7",
+    "jasmine": "^3.5.0",
     "nodemon": "^1.19.4",
+    "ts-node": "^8.6.2",
     "typescript": "^3.7.2"
   },
   "scripts": {
-    "build": "tsc -p .",
-    "dev": "tsc -p . -w"
+    "build": "tsc -p . && ",
+    "dev": "tsc -p . -w",
+    "test": "ts-node node_modules/jasmine/bin/jasmine"
+  },
+  "bin": {
+    "bot-compiler": "./bin/compiler.js"
   }
 }

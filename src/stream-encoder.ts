@@ -1,9 +1,8 @@
-import { Defer } from "./defer";
-import { MAX_BUFFER_SIZE, MAX_DELAY } from "./constants";
+export const MAX_BUFFER_SIZE = 4096;
 
 export class StreamEncoder {
   output = [];
-  response: Defer<any>;
+  response: any;
 
   setResponse(deferred) {
     this.response = deferred;
@@ -26,10 +25,6 @@ export class StreamEncoder {
   }
 
   writeNumber(number) {
-    if (number > MAX_DELAY) {
-      number = MAX_DELAY;
-    }
-
     this.writeByte(number >> 12 & 0xf);
     this.writeByte(number >> 8 & 0xf);
     this.writeByte(number >> 4 & 0xf);
