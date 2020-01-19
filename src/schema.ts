@@ -44,7 +44,7 @@ export function parseSchema(schema) {
 
     if (instruction.async) {
       return `
-      export function ${name}(...args) {
+      function ${name}(...args) {
         const encoder = toByteStream(${parsedArgs});
         const deferred = new Defer();
         encoder.setResponse(deferred);
@@ -57,7 +57,7 @@ export function parseSchema(schema) {
     }
 
     return `
-      export function ${name}(...args) {
+      function ${name}(...args) {
         push(toByteStream(${parsedArgs}));
       }
     `;
@@ -76,27 +76,20 @@ export function compile(schema) {
       return new Promise((resolve) => setTimeout(resolve, timeout));
     }
 
-    export function toByteStream(...instructions) {
+    function toByteStream(...instructions) {
       const encoder = new StreamEncoder();
       instructions.reduce((a, b) => a.concat(b)).forEach(byte => encoder.writeByte(byte));
 
       return encoder;
     }
 
-    export function readResponseByte(response) {
+    function readResponseByte(response) {
       // skip operation identifier
       response.readByte();
       return response.readByte() || 0;
     }
 
-    export class Defer<T> {
-      $: {
-        resolve: (value: T) => void;
-        reject: (error: any) => void;
-      };
-
-      promise: Promise<T>;
-
+    class Defer {
       constructor() {
         this.promise = new Promise((resolve, reject) => this.$ = { resolve, reject });
       }

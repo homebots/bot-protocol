@@ -22,7 +22,7 @@
     "typescript": "^3.7.2"
   },
   "scripts": {
-    "build": "tsc -p . && ",
+    "build": "tsc -p .",
     "dev": "tsc -p . -w",
     "test": "ts-node node_modules/jasmine/bin/jasmine"
   },

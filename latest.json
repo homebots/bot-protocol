@@ -103,7 +103,7 @@
     {
       "name": "i2CWriteAndAck",
       "code": "1c",
-      "args": []
+      "args": ["number", "byte"]
     },
     {
       "name": "i2cSendAck",
