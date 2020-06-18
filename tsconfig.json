@@ -1,15 +1,16 @@
 {
+  "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "target": "es6",
-    "outFile": "./index.js",
-    "allowUmdGlobalAccess": true,
-    "alwaysStrict": true,
-    "esModuleInterop": true,
-    "module": "amd",
-    "lib": ["es6", "dom"],
+    "moduleResolution": "node",
+    "target": "es2019",
+    "lib": ["ESNext", "DOM"],
+    "typeRoots": ["node_modules/@types"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "types": ["node"]
   },
-  "files": ["./src/index.ts"],
+  "files": ["src/index.ts"],
+  "include": ["src/**/*.ts"]
 }

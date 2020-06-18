@@ -11,7 +11,7 @@ export interface ClientSocket {
 export class ClientAbstract {
   requestQueue = [];
   responseQueue = [];
-  sendTimer: number;
+  sendTimer: any;
   client: ClientSocket;
 
   constructor() {

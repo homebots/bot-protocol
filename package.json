@@ -14,11 +14,20 @@
   },
   "homepage": "https://github.com/homebots/bot-protocol#readme",
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^13.0.0",
+    "@rollup/plugin-node-resolve": "^8.0.1",
+    "@rollup/plugin-typescript": "^4.1.2",
+    "@types/node": "^14.0.4",
     "nodemon": "^1.19.4",
-    "typescript": "^3.7.2"
+    "rollup": "^2.17.0",
+    "tslib": "^2.0.0",
+    "typescript": "^3.9.5"
   },
   "scripts": {
-    "build": "tsc -p .",
-    "dev": "tsc -p . -w"
+    "build": "rm -rf ./dist && tsc -p tsconfig.json -d --outDir dist && rollup --config",
+    "watch": "nodemon -e ts,json,js -w src -x npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
